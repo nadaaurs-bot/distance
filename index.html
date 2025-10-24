@@ -486,6 +486,45 @@
             border-radius: var(--border-radius);
             border: 1px solid #ddd;
         }
+
+        .distance-matrix {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 0.85rem;
+        }
+
+        .distance-matrix th {
+            background: var(--primary);
+            color: white;
+            padding: 10px 6px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .distance-matrix td {
+            padding: 8px 6px;
+            text-align: center;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .distance-matrix tr:hover {
+            background: #f8f9fa;
+        }
+
+        .matrix-cell {
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .matrix-header {
+            background: var(--secondary) !important;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -496,7 +535,7 @@
         <img src="./AURS.jfif" alt="Logo" class="header-logo">
         <div class="header-text">
             <h1>Calculateur de Distances Topographiques</h1>
-            <p>Extraction automatique des coordonnées et calcul des distances entre bornes adjacentes</p>
+            <p>Extraction automatique des coordonnées et calcul des distances entre toutes les bornes</p>
         </div>
     </div>
 </div>
@@ -547,7 +586,7 @@
                     </div>
 
                     <div class="result-card">
-                        <h4>Distances entre bornes adjacentes</h4>
+                        <h4>Distances entre toutes les bornes</h4>
                         <div class="formula">
                             d(M₁, M₂) = √[(x₁ - x₂)² + (y₁ - y₂)²]
                         </div>
@@ -644,7 +683,7 @@
                     showError("Aucune borne détectée. Vérifiez que l'image contient un tableau de coordonnées.");
                 } else {
                     displayBornesTable();
-                    calculateAndDisplayDistances();
+                    calculateAndDisplayAllDistances();
                     resultsContainer.style.display = 'block';
                     showSuccess(`${bornes.length} bornes extraites avec succès !`);
                 }
@@ -806,7 +845,7 @@
             editingIndex = -1;
             
             displayBornesTable();
-            calculateAndDisplayDistances();
+            calculateAndDisplayAllDistances();
             showSuccess("Coordonnées modifiées avec succès ! Les distances ont été recalculées.");
         }
 
@@ -815,7 +854,7 @@
             displayBornesTable();
         }
 
-        function calculateAndDisplayDistances() {
+        function calculateAndDisplayAllDistances() {
             const distanceResults = document.getElementById('distanceResults');
             
             if (bornes.length < 2) {
@@ -827,34 +866,77 @@
                 return;
             }
 
+            // Calculer toutes les distances entre toutes les paires de bornes
             let distancesHTML = '';
+            
+            // Créer une matrice des distances
+            distancesHTML += `
+                <h4 style="margin-bottom: 15px; color: var(--primary);">Matrice des distances (en mètres)</h4>
+                <table class="distance-matrix">
+                    <thead>
+                        <tr>
+                            <th class="matrix-header">Borne</th>
+            `;
+            
+            // En-têtes de colonnes
+            bornes.forEach(borne => {
+                distancesHTML += `<th class="matrix-header">${borne.name}</th>`;
+            });
+            
+            distancesHTML += `</tr></thead><tbody>`;
+            
+            // Corps de la matrice
+            bornes.forEach((borne1, i) => {
+                distancesHTML += `<tr><td class="matrix-header">${borne1.name}</td>`;
+                
+                bornes.forEach((borne2, j) => {
+                    if (i === j) {
+                        distancesHTML += `<td class="matrix-cell" style="background-color: #f8f9fa;">-</td>`;
+                    } else {
+                        const dx = borne1.x - borne2.x;
+                        const dy = borne1.y - borne2.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        distancesHTML += `<td class="matrix-cell">${distance.toFixed(2)}</td>`;
+                    }
+                });
+                
+                distancesHTML += `</tr>`;
+            });
+            
+            distancesHTML += `</tbody></table>`;
+            
+            // Ajouter aussi les distances individuelles pour une meilleure lisibilité
+            distancesHTML += `<h4 style="margin: 25px 0 15px 0; color: var(--primary);">Distances détaillées</h4>`;
+            
             let validDistancesCount = 0;
             
-            // Calculer uniquement les distances entre bornes adjacentes (côté à côté)
-            for (let i = 0; i < bornes.length - 1; i++) {
-                const borne1 = bornes[i];
-                const borne2 = bornes[i + 1];
-                
-                // Calcul de la distance euclidienne entre bornes adjacentes
-                const dx = borne1.x - borne2.x;
-                const dy = borne1.y - borne2.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                validDistancesCount++;
-                distancesHTML += `
-                    <div class="distance-item">
-                        <div class="distance-header">
-                            <div class="distance-borns">${borne1.name} → ${borne2.name}</div>
+            // Calculer toutes les paires uniques (sans répétition)
+            for (let i = 0; i < bornes.length; i++) {
+                for (let j = i + 1; j < bornes.length; j++) {
+                    const borne1 = bornes[i];
+                    const borne2 = bornes[j];
+                    
+                    // Calcul de la distance euclidienne
+                    const dx = borne1.x - borne2.x;
+                    const dy = borne1.y - borne2.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    validDistancesCount++;
+                    distancesHTML += `
+                        <div class="distance-item">
+                            <div class="distance-header">
+                                <div class="distance-borns">${borne1.name} → ${borne2.name}</div>
+                            </div>
+                            <div class="distance-value">${distance.toFixed(2)} m</div>
                         </div>
-                        <div class="distance-value">${distance.toFixed(2)} m</div>
-                    </div>
-                `;
+                    `;
+                }
             }
 
             if (validDistancesCount === 0) {
                 distancesHTML = `
                     <div class="no-data">
-                        Aucune distance entre bornes adjacentes trouvée
+                        Aucune distance entre bornes trouvée
                     </div>
                 `;
             }
@@ -897,4 +979,3 @@
     </script>
 </body>
 </html>
-
