@@ -525,6 +525,39 @@
             background: var(--secondary) !important;
             font-weight: 600;
         }
+
+        /* Styles pour le dessin de la parcelle */
+        .parcelle-container {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        #parcelleCanvas {
+            max-width: 100%;
+            border: 2px solid var(--primary);
+            border-radius: var(--border-radius);
+            background: white;
+            box-shadow: var(--box-shadow);
+            margin: 15px 0;
+        }
+
+        .parcelle-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .parcelle-info {
+            background: #e8f4fd;
+            padding: 12px 15px;
+            border-radius: var(--border-radius);
+            margin: 10px 0;
+            font-size: 0.9rem;
+            border: 1px solid var(--accent);
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -571,6 +604,23 @@
 
                 <div class="error-message" id="errorMessage"></div>
                 <div class="success-message" id="successMessage"></div>
+
+                <!-- Section du dessin de la parcelle déplacée ici -->
+                <div class="parcelle-container">
+                    <h3 class="section-title">Dessin de la parcelle</h3>
+                    <div class="parcelle-info">
+                        La parcelle est dessinée en reliant les bornes dans l'ordre du tableau scanné avec les cotations des distances.
+                    </div>
+                    <canvas id="parcelleCanvas" width="600" height="400"></canvas>
+                    <div class="parcelle-controls">
+                        <button class="btn btn-primary" onclick="drawParcelle()">
+                            <span>Redessiner la parcelle</span>
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearParcelle()">
+                            <span>Effacer le dessin</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="results-section">
@@ -684,6 +734,7 @@
                 } else {
                     displayBornesTable();
                     calculateAndDisplayAllDistances();
+                    drawParcelle(); // Dessiner la parcelle après extraction
                     resultsContainer.style.display = 'block';
                     showSuccess(`${bornes.length} bornes extraites avec succès !`);
                 }
@@ -846,6 +897,7 @@
             
             displayBornesTable();
             calculateAndDisplayAllDistances();
+            drawParcelle(); // Redessiner après modification
             showSuccess("Coordonnées modifiées avec succès ! Les distances ont été recalculées.");
         }
 
@@ -944,6 +996,159 @@
             distanceResults.innerHTML = distancesHTML;
         }
 
+        // Fonction pour dessiner la parcelle avec cotations
+        function drawParcelle() {
+            const canvas = document.getElementById('parcelleCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (bornes.length < 2) {
+                clearParcelle();
+                ctx.font = '16px Arial';
+                ctx.fillStyle = '#7f8c8d';
+                ctx.textAlign = 'center';
+                ctx.fillText('Au moins 2 bornes sont nécessaires pour dessiner la parcelle', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            // Effacer le canvas
+            clearParcelle();
+
+            // Calculer les limites des coordonnées
+            const xCoords = bornes.map(b => b.x);
+            const yCoords = bornes.map(b => b.y);
+            const minX = Math.min(...xCoords);
+            const maxX = Math.max(...xCoords);
+            const minY = Math.min(...yCoords);
+            const maxY = Math.max(...yCoords);
+
+            // Calculer les marges et l'échelle
+            const margin = 80;
+            const scaleX = (canvas.width - 2 * margin) / (maxX - minX || 1);
+            const scaleY = (canvas.height - 2 * margin) / (maxY - minY || 1);
+            const scale = Math.min(scaleX, scaleY);
+
+            // Fonction pour convertir les coordonnées réelles en coordonnées canvas
+            const toCanvasX = (x) => margin + (x - minX) * scale;
+            const toCanvasY = (y) => canvas.height - margin - (y - minY) * scale;
+
+            // Dessiner les lignes de la parcelle (dans l'ordre du tableau)
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(bornes[0].x), toCanvasY(bornes[0].y));
+            
+            for (let i = 1; i < bornes.length; i++) {
+                ctx.lineTo(toCanvasX(bornes[i].x), toCanvasY(bornes[i].y));
+            }
+            
+            // Fermer la parcelle en reliant la dernière borne à la première
+            if (bornes.length > 2) {
+                ctx.lineTo(toCanvasX(bornes[0].x), toCanvasY(bornes[0].y));
+            }
+            
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Dessiner les points des bornes et ajouter les cotations
+            bornes.forEach((borne, index) => {
+                const x = toCanvasX(borne.x);
+                const y = toCanvasY(borne.y);
+                
+                // Point de la borne
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fillStyle = '#e74c3c';
+                ctx.fill();
+                ctx.strokeStyle = '#c0392b';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Étiquette de la borne
+                ctx.font = 'bold 14px Arial';
+                ctx.fillStyle = '#2c3e50';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(borne.name, x, y - 10);
+            });
+
+            // Ajouter les cotations (distances entre les bornes)
+            for (let i = 0; i < bornes.length; i++) {
+                const nextIndex = (i + 1) % bornes.length;
+                const borne1 = bornes[i];
+                const borne2 = bornes[nextIndex];
+                
+                // Calculer la distance
+                const dx = borne1.x - borne2.x;
+                const dy = borne1.y - borne2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy).toFixed(2);
+                
+                // Coordonnées du milieu du segment
+                const midX = (toCanvasX(borne1.x) + toCanvasX(borne2.x)) / 2;
+                const midY = (toCanvasY(borne1.y) + toCanvasY(borne2.y)) / 2;
+                
+                // Angle du segment
+                const angle = Math.atan2(
+                    toCanvasY(borne2.y) - toCanvasY(borne1.y),
+                    toCanvasX(borne2.x) - toCanvasX(borne1.x)
+                );
+                
+                // Dessiner la cotation
+                ctx.save();
+                ctx.translate(midX, midY);
+                ctx.rotate(angle);
+                
+                // Ligne de cotation
+                ctx.beginPath();
+                ctx.moveTo(0, -15);
+                ctx.lineTo(0, 15);
+                ctx.strokeStyle = '#27ae60';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Texte de la distance
+                ctx.fillStyle = '#27ae60';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Ajuster la position du texte selon l'angle pour une meilleure lisibilité
+                if (angle > Math.PI/2 || angle < -Math.PI/2) {
+                    ctx.rotate(Math.PI);
+                    ctx.fillText(`${distance} m`, 0, -25);
+                } else {
+                    ctx.fillText(`${distance} m`, 0, 25);
+                }
+                
+                ctx.restore();
+            }
+
+            // Ajouter une échelle
+            const scaleLength = Math.max(10, Math.round((maxX - minX) / 5));
+            const scaleXStart = margin;
+            const scaleYStart = canvas.height - 20;
+            
+            ctx.beginPath();
+            ctx.moveTo(scaleXStart, scaleYStart);
+            ctx.lineTo(scaleXStart + scaleLength * scale, scaleYStart);
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#2c3e50';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${scaleLength} m`, scaleXStart + (scaleLength * scale) / 2, scaleYStart - 5);
+        }
+
+        function clearParcelle() {
+            const canvas = document.getElementById('parcelleCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Redessiner un fond blanc
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
         function showError(message) {
             errorMessage.textContent = message;
             errorMessage.style.display = 'block';
@@ -975,8 +1180,13 @@
             currentImageFile = null;
             bornes = [];
             editingIndex = -1;
+            clearParcelle();
         }
+
+        // Initialiser le canvas au chargement
+        window.onload = function() {
+            clearParcelle();
+        };
     </script>
 </body>
 </html>
-
