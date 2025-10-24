@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extraction et Recherche dans les Règlements</title>
+    <link rel="icon" href="AURS.jfif" type="image/jpeg">
+    <!-- Ajout de jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #3498db;
+            --success: #27ae60;
+            --warning: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .content {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .upload-section {
+            background: var(--light);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            border: 2px dashed #bdc3c7;
+            transition: var(--transition);
+        }
+
+        .upload-section:hover {
+            border-color: var(--accent);
+        }
+
+        .upload-area {
+            text-align: center;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .upload-area:hover {
+            transform: translateY(-2px);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: var(--accent);
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            display: none;
+            margin: 20px auto;
+            border: 1px solid #ddd;
+        }
+
+        .pdf-preview {
+            background: #e74c3c;
+            color: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #219653;
+            transform: translateY(-2px);
+        }
+
+        .btn-pdf {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-pdf:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .results-section {
+            background: var(--light);
+            padding: 25px;
+            border-radius: var(--border-radius);
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+            font-weight: 600;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ffeaea;
+            color: var(--warning);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--warning);
+            margin: 15px 0;
+            display: none;
+            font-weight: 500;
+        }
+
+        .success-message {
+            background: #e8f6ef;
+            color: var(--success);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--success);
+            margin: 15px 0;
+            display: none;
+            font-weight: 500;
+        }
+
+        .results-container {
+            display: none;
+        }
+
+        .result-card {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            box-shadow: var(--box-shadow);
+            border-left: 4px solid var(--success);
+        }
+
+        .result-card h4 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .file-info {
+            background: white;
+            padding: 12px 15px;
+            border-radius: var(--border-radius);
+            margin: 10px 0;
+            font-size: 0.85rem;
+            border: 1px solid #ddd;
+            font-family: 'Courier New', monospace;
+        }
+
+        .extracted-text {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .text-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-top: 15px;
+            font-size: 0.8rem;
+            font-family: 'Courier New', monospace;
+            border: 1px solid #ddd;
+            display: none;
+        }
+
+        .size-warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+            display: none;
+        }
+
+        .progress-section {
+            margin: 15px 0;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #2980b9);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        .part-info {
+            background: #e8f4fd;
+            padding: 10px 15px;
+            border-radius: var(--border-radius);
+            margin: 10px 0;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        .pdf-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .pdf-options {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-top: 15px;
+            border: 1px solid #ddd;
+        }
+
+        .option-group {
+            margin-bottom: 10px;
+        }
+
+        .option-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .option-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            background: white;
+        }
+
+        .page-previews {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .page-preview {
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .page-preview:hover {
+            border-color: var(--accent);
+            transform: scale(1.05);
+        }
+
+        .page-preview img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background: #f8f9fa;
+        }
+
+        .page-number {
+            text-align: center;
+            padding: 5px;
+            background: var(--light);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+    <div class="header-content">
+        <div class="header-text">
+            <h1>Extraction et Recherche dans les Règlements</h1>
+            <p>Glissez-déposez vos documents scannés et générez un PDF recherchable</p>
+        </div>
+    </div>
+</div>
+        
+
+        <div class="content">
+            <div class="upload-section">
+                <h2 class="section-title">Importation de document</h2>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <h3>Glissez-déposez votre règlement scanné</h3>
+                    <p>ou cliquez pour sélectionner un fichier (JPG, PNG, PDF)</p>
+                    <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.pdf" style="display: none;">
+                </div>
+
+                <img id="imagePreview" class="image-preview" alt="Aperçu du document">
+                <div id="pdfPreview" class="pdf-preview">
+                    <div class="upload-icon">📋</div>
+                    <h3>Document PDF détecté</h3>
+                    <p>L'extraction peut prendre plus de temps pour les fichiers PDF</p>
+                </div>
+
+                <div class="file-info" id="fileInfo" style="display: none;"></div>
+
+                <div class="size-warning" id="sizeWarning">
+                    <strong>Attention :</strong> Votre fichier est trop volumineux pour l'API OCR.space (limite: 1 MB). 
+                    Le fichier sera automatiquement divisé en plusieurs parties.
+                </div>
+
+                <div class="progress-section" id="progressSection">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Préparation...</div>
+                </div>
+
+                <div class="part-info" id="partInfo"></div>
+
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="processDocument()" id="processBtn" disabled>
+                        <span>Traiter le document</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearAll()">
+                        <span>Effacer tout</span>
+                    </button>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Traitement du document en cours...</p>
+                    <p id="loadingDetails">Conversion des pages et extraction du texte</p>
+                </div>
+
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage"></div>
+
+                <div class="debug-info" id="debugInfo"></div>
+            </div>
+
+            <div class="results-section">
+                <h2 class="section-title">Résultats</h2>
+                
+                <div class="results-container" id="resultsContainer">
+                    <div class="result-card">
+                        <h4>Aperçu des pages</h4>
+                        <div class="text-info">
+                            <span id="pageCount">0 pages</span>
+                            <span id="docType">Type: Inconnu</span>
+                        </div>
+                        
+                        <div class="page-previews" id="pagePreviews">
+                            <!-- Les aperçus des pages seront générés ici -->
+                        </div>
+
+                        <div class="pdf-options">
+                            <div class="option-group">
+                                <label class="option-label">Qualité du PDF :</label>
+                                <select class="option-select" id="pdfQuality">
+                                    <option value="high">Haute qualité</option>
+                                    <option value="medium" selected>Qualité standard</option>
+                                    <option value="low">Basse qualité</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label class="option-label">Format de page :</label>
+                                <select class="option-select" id="pageFormat">
+                                    <option value="auto" selected>Automatique</option>
+                                    <option value="A4">A4</option>
+                                    <option value="A3">A3</option>
+                                    <option value="letter">Letter</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="pdf-controls">
+                            <button class="btn btn-pdf" onclick="generateSearchablePDF()" id="pdfBtn" disabled>
+                                <span>🔍 Générer PDF Recherchable</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bibliothèque PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+
+    <script>
+        const API_KEY = "K87920529788957";
+        let currentFile = null;
+        let pageImages = []; // Stocke les images de chaque page
+        let extractedTexts = []; // Stocke le texte de chaque page
+
+        // Éléments DOM
+        const processBtn = document.getElementById('processBtn');
+        const pdfBtn = document.getElementById('pdfBtn');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const pagePreviews = document.getElementById('pagePreviews');
+        const pageCount = document.getElementById('pageCount');
+        const docType = document.getElementById('docType');
+        const debugInfo = document.getElementById('debugInfo');
+        const loadingDetails = document.getElementById('loadingDetails');
+        const sizeWarning = document.getElementById('sizeWarning');
+        const progressSection = document.getElementById('progressSection');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const partInfo = document.getElementById('partInfo');
+        const pdfQuality = document.getElementById('pdfQuality');
+        const pageFormat = document.getElementById('pageFormat');
+
+        // Configuration de PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // Gestion du drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.backgroundColor = '#e8f4fd';
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.backgroundColor = '';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.backgroundColor = '';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+            if (!validTypes.includes(file.type)) {
+                showError("Type de fichier non supporté. Veuillez utiliser JPG, PNG ou PDF.");
+                return;
+            }
+
+            currentFile = file;
+            
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.innerHTML = `
+                <strong>Fichier:</strong> ${file.name}<br>
+                <strong>Taille:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
+                <strong>Type:</strong> ${file.type}
+            `;
+            fileInfo.style.display = 'block';
+
+            // Afficher l'aperçu approprié
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const imagePreview = document.getElementById('imagePreview');
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    document.getElementById('pdfPreview').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type === 'application/pdf') {
+                document.getElementById('imagePreview').style.display = 'none';
+                document.getElementById('pdfPreview').style.display = 'block';
+            }
+
+            processBtn.disabled = false;
+            hideError();
+            hideSuccess();
+            debugInfo.style.display = 'none';
+            progressSection.style.display = 'none';
+            partInfo.style.display = 'none';
+            resultsContainer.style.display = 'none';
+        }
+
+        async function processDocument() {
+            if (!currentFile) {
+                showError("Veuillez sélectionner un fichier");
+                return;
+            }
+
+            processBtn.disabled = true;
+            loading.style.display = 'block';
+            hideError();
+            hideSuccess();
+            resultsContainer.style.display = 'none';
+            progressSection.style.display = 'block';
+            partInfo.style.display = 'block';
+
+            try {
+                pageImages = [];
+                extractedTexts = [];
+                
+                if (currentFile.type === 'application/pdf') {
+                    await processPDFDocument(currentFile);
+                } else {
+                    await processImageDocument(currentFile);
+                }
+                
+                // Afficher les aperçus des pages
+                displayPagePreviews();
+                pdfBtn.disabled = false;
+                resultsContainer.style.display = 'block';
+                showSuccess(`Document traité avec succès ! ${pageImages.length} page(s) préparée(s).`);
+                
+            } catch (error) {
+                showError("Erreur: " + error.message);
+                console.error("Détails:", error);
+            } finally {
+                processBtn.disabled = false;
+                loading.style.display = 'none';
+                progressSection.style.display = 'none';
+            }
+        }
+
+        async function processPDFDocument(pdfFile) {
+            const arrayBuffer = await pdfFile.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const numPages = pdf.numPages;
+            
+            pageCount.textContent = `${numPages} pages`;
+            docType.textContent = "Type: PDF";
+            
+            debugInfo.innerHTML = `<strong>PDF chargé:</strong> ${numPages} page(s) détectée(s)<br>`;
+            
+            // Traiter chaque page
+            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                updateProgress(((pageNum - 1) / numPages) * 100, `Traitement page ${pageNum}/${numPages}`);
+                partInfo.innerHTML = `Conversion de la page ${pageNum} en image...`;
+                
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 2.0 }); // Échelle plus élevée pour une meilleure qualité
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                await page.render({
+                    canvasContext: ctx,
+                    viewport: viewport
+                }).promise;
+                
+                // Convertir le canvas en URL de données
+                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                pageImages.push({
+                    dataUrl: imageDataUrl,
+                    width: canvas.width,
+                    height: canvas.height,
+                    pageNumber: pageNum
+                });
+                
+                // Extraire le texte pour le PDF recherchable
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                extractedTexts.push(pageText);
+                
+                debugInfo.innerHTML += `Page ${pageNum} convertie en image<br>`;
+            }
+            
+            updateProgress(100, "Conversion terminée");
+        }
+
+        async function processImageDocument(imageFile) {
+            pageCount.textContent = "1 page";
+            docType.textContent = "Type: Image";
+            
+            updateProgress(50, "Traitement de l'image...");
+            partInfo.innerHTML = "Conversion de l'image...";
+            
+            // Créer une image à partir du fichier
+            const imageDataUrl = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(imageFile);
+            });
+            
+            // Créer un canvas pour obtenir les dimensions
+            const img = new Image();
+            await new Promise((resolve) => {
+                img.onload = resolve;
+                img.src = imageDataUrl;
+            });
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            pageImages.push({
+                dataUrl: canvas.toDataURL('image/jpeg', 0.8),
+                width: canvas.width,
+                height: canvas.height,
+                pageNumber: 1
+            });
+            
+            // Extraire le texte pour le PDF recherchable
+            const extractedText = await callOCRSpaceAPI(imageFile);
+            extractedTexts.push(extractedText);
+            
+            updateProgress(100, "Conversion terminée");
+            debugInfo.innerHTML = "Image convertie avec succès<br>";
+        }
+
+        function displayPagePreviews() {
+            pagePreviews.innerHTML = '';
+            pageImages.forEach((page, index) => {
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'page-preview';
+                previewDiv.innerHTML = `
+                    <img src="${page.dataUrl}" alt="Page ${page.pageNumber}">
+                    <div class="page-number">Page ${page.pageNumber}</div>
+                `;
+                pagePreviews.appendChild(previewDiv);
+            });
+        }
+
+        async function callOCRSpaceAPI(file) {
+            const formData = new FormData();
+            formData.append('apikey', API_KEY);
+            formData.append('file', file);
+            formData.append('language', 'fre');
+            formData.append('isOverlayRequired', 'false');
+            formData.append('OCREngine', '2');
+
+            try {
+                const response = await fetch('https://api.ocr.space/parse/image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.IsErroredOnProcessing) {
+                    throw new Error("OCR.space: " + data.ErrorMessage);
+                }
+
+                if (!data.ParsedResults || data.ParsedResults.length === 0) {
+                    return "";
+                }
+
+                return data.ParsedResults[0].ParsedText || "";
+
+            } catch (error) {
+                console.error("Erreur OCR:", error);
+                return "";
+            }
+        }
+
+        async function generateSearchablePDF() {
+            if (pageImages.length === 0) {
+                showError("Aucune page à exporter vers PDF");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const fileName = currentFile ? currentFile.name.replace(/\.[^/.]+$/, "") : "document";
+            
+            loading.style.display = 'block';
+            loadingDetails.textContent = "Génération du PDF recherchable...";
+            
+            try {
+                for (let i = 0; i < pageImages.length; i++) {
+                    const page = pageImages[i];
+                    const pageText = extractedTexts[i] || "";
+                    
+                    if (i > 0) {
+                        doc.addPage();
+                    }
+                    
+                    // Adapter l'image à la page PDF (en arrière-plan)
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const imgWidth = page.width;
+                    const imgHeight = page.height;
+                    
+                    const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+                    const width = imgWidth * ratio;
+                    const height = imgHeight * ratio;
+                    const x = (pageWidth - width) / 2;
+                    const y = (pageHeight - height) / 2;
+                    
+                    // Ajouter l'image en arrière-plan
+                    doc.addImage(page.dataUrl, 'JPEG', x, y, width, height, `page${i}`, 'FAST');
+                    
+                    // Ajouter le texte invisible par-dessus
+                    if (pageText.trim().length > 0) {
+                        doc.setFontSize(1);
+                        doc.setTextColor(255, 255, 255, 0); // Texte invisible
+                        doc.text(pageText, 10, 10);
+                    }
+                }
+                
+                // Sauvegarder le PDF
+                doc.save(`${fileName}_recherchable.pdf`);
+                showSuccess("PDF recherchable généré avec succès !");
+                
+            } catch (error) {
+                showError("Erreur lors de la génération du PDF: " + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function updateProgress(percent, text) {
+            progressFill.style.width = `${percent}%`;
+            progressText.textContent = text;
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            hideSuccess();
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            hideError();
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        function hideSuccess() {
+            successMessage.style.display = 'none';
+        }
+
+        function clearAll() {
+            fileInput.value = '';
+            document.getElementById('imagePreview').style.display = 'none';
+            document.getElementById('pdfPreview').style.display = 'none';
+            document.getElementById('fileInfo').style.display = 'none';
+            resultsContainer.style.display = 'none';
+            processBtn.disabled = true;
+            pdfBtn.disabled = true;
+            hideError();
+            hideSuccess();
+            debugInfo.style.display = 'none';
+            sizeWarning.style.display = 'none';
+            progressSection.style.display = 'none';
+            partInfo.style.display = 'none';
+            pagePreviews.innerHTML = '';
+            currentFile = null;
+            pageImages = [];
+            extractedTexts = [];
+            pageCount.textContent = '0 pages';
+            docType.textContent = 'Type: Inconnu';
+        }
+    </script>
+</body>
+</html>
